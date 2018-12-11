@@ -2,7 +2,7 @@
 set -e
 
 if [ $REPLICATION_ROLE = "master" ]; then
-    psql -U postgres -c "CREATE ROLE $REPLICATION_USER WITH REPLICATION PASSWORD '$REPLICATION_PASSWORD' LOGIN"
+    PGPASSWORD=${POSTGRES_PASSWORD:-""} psql -U $POSTGRES_USER -d $POSTGRES_DB -c "CREATE ROLE $REPLICATION_USER WITH REPLICATION PASSWORD '$REPLICATION_PASSWORD' LOGIN"
 
 elif [ $REPLICATION_ROLE = "slave" ]; then
     # stop postgres instance and reset PGDATA,
@@ -10,6 +10,8 @@ elif [ $REPLICATION_ROLE = "slave" ]; then
     pg_ctl -D "$PGDATA" -m fast -w stop
     # make sure standby's data directory is empty
     rm -r "$PGDATA"/*
+
+    until PGPASSWORD=${REPLICATION_PASSWORD:-""} pg_isready -h $POSTGRES_MASTER_SERVICE_HOST -p $POSTGRES_MASTER_SERVICE_PORT -U $REPLICATION_USER -d $POSTGRES_DB; do echo waiting for database; sleep 2; done;
 
     pg_basebackup \
          --write-recovery-conf \
